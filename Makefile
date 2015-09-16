@@ -5,6 +5,8 @@ obj-m +=led.o
 obj-m +=button.o
 obj-m += powerRelay.o
 obj-m +=ads8320.o
+obj-m +=ioGather.o
+obj-m +=relayCtl.o
 modules:
 	$(MAKE) -C $(ARM_LINUX_KERNEL) M=$(CURRENT_PATH) modules
 

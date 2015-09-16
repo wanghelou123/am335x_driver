@@ -1,11 +1,9 @@
 
 #include <linux/init.h>
 #include <linux/err.h>
-#include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/ioctl.h>
 #include <linux/fs.h>
-#include <linux/err.h>
 #include <linux/err.h>
 #include <linux/list.h>
 #include <linux/errno.h>
@@ -183,6 +181,27 @@ static int ads8320_open(struct inode *inode, struct file *filp)
 
 static int ads8320_release(struct inode *inode, struct file *filp)
 {
+	struct ads8320_data	*ads8320;
+	int			status = 0;
+
+	mutex_lock(&device_list_lock);
+	ads8320 = filp->private_data;
+	filp->private_data = NULL;
+
+	/* last close? */
+	ads8320->users--;
+	if (!ads8320->users) {
+		int dofree;
+		
+		spin_lock_irq(&ads8320->spi_lock);
+		dofree = (ads8320->spi == NULL);
+		spin_unlock_irq(&ads8320->spi_lock);
+
+		if(dofree)
+			kfree(ads8320);
+	}
+	mutex_unlock(&device_list_lock);
+
 	return 0;
 }
 
@@ -327,7 +346,8 @@ static int __init ads8320_init(void)
 	if (status < 0) {
 		class_destroy(ads8320_class);
 	}
-	printk(KERN_NOTICE "ads8320 driver register success.\n" );
+	else
+		printk(KERN_NOTICE "ads8320 driver register success.\n" );
 	return status;
 }
 
