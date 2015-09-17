@@ -27,6 +27,7 @@ struct io_gather_data {
 	struct list_head	device_entry;
 	unsigned			users;
 	struct gpio_klha_platform_data *data;
+	char			*channel_value;
 };
 
 static LIST_HEAD(device_list);
@@ -41,25 +42,23 @@ static const struct of_device_id of_io_gather_match[] = {
 static size_t io_gather_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
 {
 	unsigned long err = 0;
-	unsigned int value = 0;
 	int i = 0;
 	struct io_gather_data *io_gather;	
 	io_gather = filp->private_data;
+	
+	count = min(count, io_gather->data->nums);
 
 	for(i=0; i<io_gather->data->nums; i++) {
-		printk("[%d]=%d==>%d\n", i,io_gather->data->gpio_array[i], gpio_get_value(io_gather->data->gpio_array[i]) );
-		if(gpio_get_value(io_gather->data->gpio_array[i])) {
-			value |= 1<<i;
-		}
+		//printk("[%d]=%d==>%d\n", i,io_gather->data->gpio_array[i], gpio_get_value(io_gather->data->gpio_array[i]) );
+		io_gather->channel_value[i] =(gpio_get_value(io_gather->data->gpio_array[i])) ? 1:0;
 	}
 
-	printk("vlaue = %8x\n", value);
-	err = copy_to_user(buf, (void *)&value, 4);
+	err = copy_to_user(buf, (void *)io_gather->channel_value, count);
 
 	if(err)
 		return -EFAULT;
 	else
-		return min(4, count);
+		return count;
 }
 
 static int io_gather_open(struct inode *inode, struct file *filp)
@@ -112,7 +111,7 @@ static void io_gather_setup_cdev(struct io_gather_data *io_gather, int index)
 
 	err = cdev_add(&io_gather->cdev, devno, 1);
 	if(err)
-		printk(KERN_NOTICE "Error %s adding ioGather",err);
+		printk(KERN_NOTICE "Error %d adding ioGather",err);
 }
 
 static int __devinit io_gather_probe(struct platform_device *pdev)
@@ -139,6 +138,10 @@ static int __devinit io_gather_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	io_gather->channel_value = kzalloc(io_gather->data->nums, GFP_KERNEL);
+	if(!io_gather->channel_value)
+		return -ENOMEM;
+
 	//打印管脚信息
 	int i =0;
 	for(i=0; i<io_gather->data->nums; i++) {
@@ -156,8 +159,10 @@ static int __devinit io_gather_probe(struct platform_device *pdev)
 
 	if (status == 0)
 		platform_set_drvdata(pdev, io_gather);	
-	else
+	else {
+		kfree(io_gather->channel_value);
 		kfree(io_gather);
+	}
 
 	return status;
 }
@@ -169,8 +174,10 @@ static int __devexit io_gather_remove(struct platform_device *pdev)
 	cdev_del(&io_gather->cdev);//在系统中删除 cdev
 	device_destroy(io_gather_class, io_gather->devt);//删除/dev上的节点
 	unregister_chrdev_region(io_gather->devt, 1);//释放设备号
-	if (io_gather->users == 0)
+	if (io_gather->users == 0){
+		kfree(io_gather->channel_value);
 		kfree(io_gather);
+	}
 
 	return 0;
 }

@@ -26,6 +26,7 @@ struct relay_ctl_data {
 	dev_t				devt;
 	unsigned			users;
 	struct gpio_klha_platform_data *data;
+	char * relayStatus;
 };
 struct relay_ctl_data * relay_ctl;
 
@@ -40,38 +41,39 @@ static const struct of_device_id of_relay_ctl_match[] = {
 static size_t relay_ctl_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
 {
 	unsigned long err = 0;
-	unsigned int value = 0;
-	int i = 0;
+	//printk("relay_ctl_read():count = %d\n.", count);
+	//printk("relay_ctl->data->num = %d\n.", relay_ctl->data->nums+(relay_ctl->data->device_status?1:0));
 
-	for(i=0; i<relay_ctl->data->nums; i++) {
-		if(gpio_direction_input(relay_ctl->data->gpio_array[i])) {
-			value |= 1<<i;
-		}
-	}
+	count = min(count, relay_ctl->data->nums + (relay_ctl->data->device_status?1:0));
 
-	printk("vlaue = %8x\n", value);
-	err = copy_to_user(buf, (void *)&value, 4);
+	relay_ctl->relayStatus[0] = (gpio_get_value(relay_ctl->data->device_status))?1:0;
+
+	err = copy_to_user(buf, relay_ctl->relayStatus, count);
 
 	if(err)
 		return -EFAULT;
 	else
-		return min(4, count);
+		return  count;
 }
 
 static int relay_ctl_ioctl (struct file *file, unsigned int cmd, unsigned long arg)
 {
+	//printk("cmd = %d\n", cmd);
+	//printk("arg = %d\n", arg);
 	if(arg >= relay_ctl->data->nums || arg < 0)
 		return -EINVAL;
 
 	switch(cmd)	 {
-		gpio_direction_output(relay_ctl->data->gpio_array[arg], 0);	
-	case 0:
-	break;
-	case 1:
-		gpio_direction_output(relay_ctl->data->gpio_array[arg], 1);	
-	break;
-	default:
-		return -EINVAL;
+		case 0:
+			gpio_direction_output(relay_ctl->data->gpio_array[arg], 0);	
+			relay_ctl->relayStatus[arg+1] = 0;
+		break;
+		case 1:
+			gpio_direction_output(relay_ctl->data->gpio_array[arg], 1);	
+			relay_ctl->relayStatus[arg+1] = 1;
+		break;
+		default:
+			return -EINVAL;
 	}
 
 	return 0;
@@ -82,7 +84,8 @@ static int relay_ctl_open(struct inode *inode, struct file *filp)
 {
 	//struct relay_ctl_data *relay_ctl;	
 	//relay_ctl = filp->private_data;
-	if(!relay_ctl) {
+	#if 0
+	if(NULL == relay_ctl) {
 		printk(KERN_ERR "privte_data is NULL;\n");
 		return -ENODEV;
 	}
@@ -90,13 +93,18 @@ static int relay_ctl_open(struct inode *inode, struct file *filp)
 	relay_ctl->users++;
 	mutex_unlock(&device_relayCtl_lock);
 
+	#endif
+	return 0;
+
 }
 
 static int relay_ctl_release(struct inode *inode, struct file *filp)
 {
+#if 0
 	mutex_lock(&device_relayCtl_lock);
 	relay_ctl->users--;
 	mutex_unlock(&device_relayCtl_lock);
+#endif
 
 	return 0;
 }
@@ -135,7 +143,6 @@ static int __devinit relay_ctl_probe(struct platform_device *pdev)
 
 	relay_ctl_setup_cdev(relay_ctl, 0);
 
-	platform_set_drvdata(pdev, relay_ctl);	
 
 	relay_ctl->data = pdev->dev.platform_data;
 	if(!relay_ctl->data) {
@@ -143,9 +150,14 @@ static int __devinit relay_ctl_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-	//打印管脚信息
+	relay_ctl->relayStatus = kzalloc(relay_ctl->data->nums + 1, GFP_KERNEL);
+	if(!relay_ctl->relayStatus)
+		return -ENOMEM;
+
+	//打印管脚信息,并保存管脚状态
 	int i =0;
 	for(i=0; i<relay_ctl->data->nums; i++) {
+		relay_ctl->relayStatus[i+1] = (gpio_get_value(relay_ctl->data->gpio_array[i]))? 1: 0;
 		printk(KERN_NOTICE "relayCtl channel_%d gpio=>%d\n", i, relay_ctl->data->gpio_array[i]);	
 	}
 
@@ -154,8 +166,12 @@ static int __devinit relay_ctl_probe(struct platform_device *pdev)
 	dev = device_create(relay_ctl_class, &pdev->dev, relay_ctl->devt, relay_ctl, "relayCtl");
 	status = IS_ERR(dev) ? PTR_ERR(dev) : 0;
 
-	if (!status)
+	if (status == 0)
+		platform_set_drvdata(pdev, relay_ctl);	
+	else {
+		kfree(relay_ctl->relayStatus);
 		kfree(relay_ctl);
+	}
 
 	return status;
 }
@@ -166,6 +182,7 @@ static int __devexit relay_ctl_remove(struct platform_device *pdev)
 	device_destroy(relay_ctl_class, relay_ctl->devt);//删除/dev上的节点
 	unregister_chrdev_region(relay_ctl->devt, 1);//释放设备号
 	if (relay_ctl->users == 0)
+		kfree(relay_ctl->relayStatus);
 		kfree(relay_ctl);
 
 	return 0;
