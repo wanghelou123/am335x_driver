@@ -1,9 +1,13 @@
 #include <linux/init.h>
 #include <linux/export.h>
 #include <linux/module.h>
+#include <linux/cdev.h>
 #include <linux/moduleparam.h>
+#include <linux/platform_device.h>
+#include <linux/of_platform.h>
+#include <linux/of_gpio.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
-#include <linux/miscdevice.h>
 #include <linux/types.h>
 #include <linux/io.h>
 #include <linux/fs.h>  
@@ -11,20 +15,36 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/poll.h>
- #include <linux/sched.h>
-
+#include <linux/sched.h>
+#include <linux/klha_gpio.h>
+#include <asm/uaccess.h> //copy_to_user 头文件
 #define DEVICE_NAME "button"
-#define GPIO_TO_PIN(bank, gpio) (32 * (bank) + (gpio))
-#define	RESET_BUTTON	GPIO_TO_PIN(0, 17)
 
 static volatile char key_value = 0;
 static volatile int ev_press = 0;
 static DECLARE_WAIT_QUEUE_HEAD(button_waitq);
 
+static int major = 0;
+static struct class * button_class;
+struct button_data {
+	struct cdev			cdev;
+	dev_t				devt;
+	struct list_head	device_entry;
+	unsigned			users;
+	struct gpio_klha_platform_data	*data;
+};
 
+static LIST_HEAD(device_list);
+static DEFINE_MUTEX(device_button_lock);
+
+static const struct of_device_id of_button_match[] = {
+	{.compatible = "button",},
+	{},
+};
 /*描述按键的结构体*/
 struct button_irq_desc {
 	int irq;
+	int gpio;
 	char *name;
 };
 
@@ -32,7 +52,7 @@ struct button_irq_desc mybutton;
 
 static irqreturn_t button_handler(int irq, void *dev_id) 
 {
-	key_value = gpio_get_value(RESET_BUTTON) & 0x01;
+	key_value = gpio_get_value(mybutton.gpio) & 0x01;
 	ev_press = 1;
 
 	wake_up_interruptible(&button_waitq);
@@ -41,17 +61,7 @@ static irqreturn_t button_handler(int irq, void *dev_id)
 
 }
 
-static int am3352_button_open(struct inode * inode, struct file *file)
-{
-	return 0;
-}
-
-static int am3352_button_close(struct inode *node, struct file *file)
-{
-
-	return 0;
-}
-static int am3352_button_read(struct file *filp, char __user *buffer, size_t count, loff_t *offp)
+static int button_read(struct file *filp, char __user *buffer, size_t count, loff_t *offp)
 {
 	unsigned long err;
 	if(!ev_press) {
@@ -73,37 +83,112 @@ static int am3352_button_read(struct file *filp, char __user *buffer, size_t cou
 	
 }
 
-static struct file_operations dev_fops = {
-		.owner =     THIS_MODULE,
-		.open	= am3352_button_open,
-		.release	= am3352_button_close,	
-		.read	= am3352_button_read,
-		//.poll	= am3352_button_poll,
-}; 
+ 
 
-static struct miscdevice misc = {
-		.minor = MISC_DYNAMIC_MINOR,
-		.name  = DEVICE_NAME,
-		.fops  = &dev_fops,
-};
+static int button_open(struct inode *inode, struct file *filp)
+{
+	struct button_data *pdata;
+	int status = -ENXIO;
 
-static int __init dev_init(void){
-
-	int ret;
-	unsigned long irqflags;
-
-	ret = misc_register(&misc);
-	if(ret < 0) {
-		printk(DEVICE_NAME ":can't register device.");
+	mutex_lock(&device_button_lock);
+	list_for_each_entry(pdata, &device_list, device_entry) {
+		if(pdata->devt == inode->i_rdev) {
+			status = 0;
+			break;
+		}
 	}
 
-	mybutton.irq = gpio_to_irq(RESET_BUTTON),	
+	if(status == 0) {
+		pdata->users++;
+		filp->private_data = pdata;
+	}
+
+	mutex_unlock(&device_button_lock);
+
+	return status;
+}
+
+static int button_release(struct inode *inode, struct file *filp)
+{
+	struct button_data	*pdata;
+	pdata = filp->private_data;
+
+	mutex_lock(&device_button_lock);
+	pdata->users--;
+	mutex_unlock(&device_button_lock);
+
+	return 0;
+}
+	
+
+
+static struct file_operations dev_fops = {
+		.owner =     THIS_MODULE,
+		.open	= button_open,
+		.release	= button_release,	
+		.read	= button_read,
+		//.poll	= button_poll,
+};
+static void button_setup_cdev(struct button_data *pdata, int index)
+{
+	int err, devno = MKDEV(major, index);
+	cdev_init(&pdata->cdev, &dev_fops);
+
+	err = cdev_add(&pdata->cdev, devno, 1);
+	if(err)
+		printk(KERN_NOTICE "Error %d adding button\n", err);
+}
+
+static int __devinit button_probe(struct platform_device *pdev)
+{
+	int status;
+	int ret;
+	unsigned long irqflags;
+	struct button_data * pdata;
+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
+	if(!pdata)
+		return -ENOMEM;
+
+	status = alloc_chrdev_region(&pdata->devt, 0, 1, DEVICE_NAME);
+	if(status < 0)
+		return status;
+	major = MAJOR(pdata->devt);
+
+	button_setup_cdev(pdata, 0);
+
+	pdata->data = pdev->dev.platform_data;
+	if(!pdata->data) {
+		printk(KERN_ERR "NOT FIND GPIO.");
+		return -ENODEV;
+	}
+
+	//打印管脚信息
+	int i=0;
+	for(i = 0; i<pdata->data->nums; i++) {
+		printk(KERN_NOTICE "button%d gpio=>%d\n", i, pdata->data->gpio_array[i]);
+	}
+
+	/*创建一个设备节点，名为/dev/button */
+	struct device *dev;
+	dev = device_create(button_class, &pdev->dev, pdata->devt, pdata, "button");
+	status = IS_ERR(dev) ?PTR_ERR(dev) : 0;
+	
+	if (status == 0) {
+		list_add(&pdata->device_entry, &device_list);
+		platform_set_drvdata(pdev, pdata);	
+	} else {
+		kfree(pdata);
+	}
+
+
+	mybutton.irq = gpio_to_irq( pdata->data->gpio_array[0]),	
+	mybutton.gpio = pdata->data->gpio_array[0];
 	mybutton.name="KEY";
 	printk("the gpio_key irq is [%d].\n", mybutton.irq);
 
-	ret = gpio_request(RESET_BUTTON, "reset");
+	ret = gpio_request( pdata->data->gpio_array[0], "reset");
 	if(ret<0)
-		printk("gpio_request error, %d\n", RESET_BUTTON);
+		printk("gpio_request error, %d\n",  pdata->data->gpio_array[0]);
 	
 	irqflags = IRQ_TYPE_EDGE_BOTH;
 
@@ -113,19 +198,67 @@ static int __init dev_init(void){
 		return -1;
 	}
 
-	printk(DEVICE_NAME"\tinitialized\n");
-	
-	return ret;
+	return status;
 }
 
-static void __exit dev_exit(void){
+static int __devexit button_remove(struct platform_device *pdev)
+{
+	struct button_data *pdata;
+	pdata = platform_get_drvdata(pdev);
+	
 	disable_irq(mybutton.irq);
 	free_irq(mybutton.irq, NULL);
-	gpio_free(RESET_BUTTON);
 
-	misc_deregister(&misc);
+	cdev_del(&pdata->cdev);
+	device_destroy(button_class, pdata->devt);
+	unregister_chrdev_region(pdata->devt, 1);
+	printk("pdata->users=>%d\n", pdata->users);
+	if(pdata->users == 0) {
+		int i;
+		for(i=0; i<pdata->data->nums ; i++) {
+			gpio_free(pdata->data->gpio_array[i]);
+		}
+		kfree(pdata);
+	}
 }
 
+static struct platform_driver button_driver = {
+	.probe = button_probe,
+	.remove = __devexit_p(button_remove),
+	.driver = {
+		.name = "button",
+		.owner = THIS_MODULE,
+		.of_match_table = of_button_match,
+	},
+};
+
+static int __init dev_init(void)
+{
+	int status;
+
+	button_class = class_create(THIS_MODULE, "button");
+	if (IS_ERR(button_class)) {
+		return PTR_ERR(button_class);
+	}
+	status = platform_driver_register(&button_driver);
+
+	if(status < 0 ) {
+		printk(KERN_ERR "register button to platform failed!\n");
+		class_destroy(button_class);
+	}else
+		printk(KERN_NOTICE "button driver register success.\n");
+
+
+	return status;
+}
+
+static void __exit dev_exit(void)
+{
+
+	platform_driver_unregister(&button_driver);
+	class_destroy(button_class);
+	printk(KERN_NOTICE "button driver unregister success.\n");
+}
 module_init(dev_init);
 module_exit(dev_exit);
 MODULE_LICENSE("GPL");
