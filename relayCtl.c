@@ -41,12 +41,20 @@ static const struct of_device_id of_relay_ctl_match[] = {
 static size_t relay_ctl_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos)
 {
 	unsigned long err = 0;
+	int i;
 	//printk("relay_ctl_read():count = %d\n.", count);
 	//printk("relay_ctl->data->num = %d\n.", relay_ctl->data->nums+(relay_ctl->data->device_status?1:0));
 
 	count = min(count, relay_ctl->data->nums + (relay_ctl->data->device_status?1:0));
 
-	relay_ctl->relayStatus[0] = (gpio_get_value(relay_ctl->data->device_status))?1:0;
+	if(relay_ctl->data->device_status) {//只返回控制盒是否插入的状态
+		relay_ctl->relayStatus[0] = (gpio_get_value(relay_ctl->data->device_status))?1:0;
+	}
+	else {
+		for(i=0;i<relay_ctl->data->nums;i++){//返回继电器的状态
+			relay_ctl->relayStatus[i] = gpio_get_value(	relay_ctl->data->gpio_array[i]);
+		}	
+	}
 
 	err = copy_to_user(buf, relay_ctl->relayStatus, count);
 
@@ -60,6 +68,10 @@ static int relay_ctl_ioctl (struct file *file, unsigned int cmd, unsigned long a
 {
 	//printk("cmd = %d\n", cmd);
 	//printk("arg = %d\n", arg);
+	cmd = _IOC_NR(cmd);
+	if(cmd!=0 && cmd !=1)	
+		return -EINVAL;
+
 	if(arg >= relay_ctl->data->nums || arg < 0)
 		return -EINVAL;
 
