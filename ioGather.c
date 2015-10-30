@@ -50,7 +50,11 @@ static size_t io_gather_read(struct file *filp, char __user *buf, size_t count, 
 
 	for(i=0; i<io_gather->data->nums; i++) {
 		//printk("[%d]=%d==>%d\n", i,io_gather->data->gpio_array[i], gpio_get_value(io_gather->data->gpio_array[i]) );
-		io_gather->channel_value[i] =(gpio_get_value(io_gather->data->gpio_array[i])) ? 1:0;
+		if(gpio_get_value(io_gather->data->gpio_array[i])) {
+			io_gather->channel_value[i] = (io_gather->data->active_low)? 0 : 1;
+		}else {
+			io_gather->channel_value[i] = (io_gather->data->active_low)? 1 : 0;
+		}
 	}
 
 	err = copy_to_user(buf, (void *)io_gather->channel_value, count);

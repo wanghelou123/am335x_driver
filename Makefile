@@ -8,6 +8,8 @@ obj-m +=ads8320.o
 obj-m +=ioGather.o
 obj-m +=relayCtl.o
 obj-m +=lcd1602.o
+
+obj-m +=ds18b20.o
 modules:
 	$(MAKE) -C $(ARM_LINUX_KERNEL) M=$(CURRENT_PATH) modules
 
