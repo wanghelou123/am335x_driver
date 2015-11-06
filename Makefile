@@ -10,6 +10,7 @@ obj-m +=relayCtl.o
 obj-m +=lcd1602.o
 obj-m +=ds18b20.o
 obj-m +=buzzer.o
+obj-m +=pwmin.o
 modules:
 	$(MAKE) -C $(ARM_LINUX_KERNEL) M=$(CURRENT_PATH) modules
 
