@@ -112,6 +112,8 @@ static void powerRelay_setup_cdev(struct powerRelay_data *pdata, int index)
 static int __devinit powerRelay_probe(struct platform_device *pdev)
 {
 	int status;
+	int i=0;
+	struct device *dev;
 	struct powerRelay_data * pdata;
 	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
 	if(!pdata)
@@ -131,14 +133,12 @@ static int __devinit powerRelay_probe(struct platform_device *pdev)
 	}
 
 	//打印管脚信息
-	int i=0;
 	for(i = 0; i<pdata->data->nums; i++) {
 		gpio_request(pdata->data->gpio_array[i], NULL);
 		printk(KERN_NOTICE "%s%d gpio => %d\n", DEVICE_NAME, i, pdata->data->gpio_array[i]);
 	}
 
 	/*创建一个设备节点，名为/dev/powerRelay */
-	struct device *dev;
 	dev = device_create(powerRelay_class, &pdev->dev, pdata->devt, pdata, DEVICE_NAME);
 	status = IS_ERR(dev) ?PTR_ERR(dev) : 0;
 	
@@ -167,6 +167,8 @@ static int __devexit powerRelay_remove(struct platform_device *pdev)
 		}
 		kfree(pdata);
 	}
+
+	return 0;
 }
 
 static struct platform_driver powerRelay_driver = {
