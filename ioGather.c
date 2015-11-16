@@ -19,7 +19,7 @@
 #define	DEVICE_NAME	"ioGather"
 static int major = 0;
 static unsigned long minor = 0;
-static struct classs *io_gather_class;
+static struct class *io_gather_class;
 
 struct io_gather_data {
 	struct cdev			cdev;

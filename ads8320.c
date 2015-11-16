@@ -205,7 +205,7 @@ static int ads8320_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static struct classs *ads8320_class;
+static struct class *ads8320_class;
 
 static const struct file_operations ads8320_fops = {
 	.owner	= THIS_MODULE,

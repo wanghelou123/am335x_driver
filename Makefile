@@ -12,6 +12,7 @@ obj-m +=ds18b20.o
 obj-m +=buzzer.o
 obj-m +=pwmin.o
 obj-m +=max538.o
+obj-m +=ads124x.o
 modules:
 	$(MAKE) -C $(ARM_LINUX_KERNEL) M=$(CURRENT_PATH) modules
 
