@@ -13,6 +13,7 @@ obj-m +=buzzer.o
 obj-m +=pwmin.o
 obj-m +=max538.o
 obj-m +=ads124x.o
+obj-m +=pwmout.o
 modules:
 	$(MAKE) -C $(ARM_LINUX_KERNEL) M=$(CURRENT_PATH) modules
 
