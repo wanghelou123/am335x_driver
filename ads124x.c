@@ -45,14 +45,15 @@ struct ads124x_data {
 	unsigned int		ad_value;
 	struct ads124x_platform_data *data;
 };
+
 struct omap2_mcspi_cs {
-    void __iomem        *base;
-	    unsigned long       phys;
-		    int         word_len;
-			    struct list_head    node;
-				    /* Context save and restore shadow register */
-					    u32         chconf0;
-						};
+	void __iomem        *base;
+	unsigned long       phys;
+	int         word_len;
+	struct list_head    node;
+	/* Context save and restore shadow register */
+	u32         chconf0;
+};
 
 
 static LIST_HEAD(device_list);
@@ -100,7 +101,7 @@ unsigned char ads124x_read_char(struct ads124x_data *ads124x)
 	ret = ads124x_sync(ads124x, &m);
 	pr_info("ret = %d\n", ret);
 	//rx_byte = ads124x->buffer[0];
-	
+
 	return rx_byte;
 }
 
@@ -111,8 +112,6 @@ void  ads124x_read_reg(struct ads124x_data *ads124x, unsigned char reg,unsigned 
 	ads124x->spi->mode= SPI_MODE_1;
 	spi_setup(ads124x->spi);
 
-	//ads124x_write_char(ADS1247_COMMAND_RREG_1ST|reg);
-	//ads124x_write_char(ADS1247_COMMAND_RREG_2ND|(num));
 #if 1
 	struct spi_message m;
 	ads124x->buffer[0] = ADS1247_COMMAND_RREG_1ST|reg;
@@ -120,7 +119,6 @@ void  ads124x_read_reg(struct ads124x_data *ads124x, unsigned char reg,unsigned 
 	struct spi_transfer t = {
 		.tx_buf = ads124x->buffer,
 		.len = 2,
-		//.delay_usecs = 2,
 	};
 
 	spi_message_init(&m);
@@ -203,7 +201,6 @@ static void ads124x_reset(unsigned gpio)
 void ads124x_read_once(struct ads124x_data *ads124x)
 {
 	gpio_set_value(ads124x->data->START, 1);
-	//ndelay(244*5);
 	udelay(2);
 	gpio_set_value(ads124x->data->START, 0);
 }
@@ -294,12 +291,8 @@ static ssize_t ads124x_read(struct file *filp, char __user *buf, size_t count, l
 	count = 4;
 	struct ads124x_data	*ads124x;
 	ads124x = filp->private_data;
-		//printk("RESET => %d\n", ads124x->data->RESET);
-		//printk("START => %d\n", ads124x->data->START);
-		//printk("DRDY => %d\n", ads124x->data->DRDY);
 	ads124x_read_once(ads124x);
 	ads124x_data_ready(ads124x);
-	///ads124x_read_reg(ADS1247_ADDR_MUX0, 15);
 
 	err = copy_to_user(buf, (void*)&ads124x->ad_value, 4);
 
@@ -307,7 +300,7 @@ static ssize_t ads124x_read(struct file *filp, char __user *buf, size_t count, l
 		return -EFAULT;
 	else
 		return min(4, count);
-	
+
 }
 
 static long ads124x_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
@@ -320,42 +313,46 @@ static long ads124x_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 		return -EINVAL;
 
 	ads124x_reset(ads124x->data->RESET);
-	ads124x_write_reg(ads124x, ADS1247_ADDR_SYS0, ADS1248_PGA_USE|ADS1248_SPS_USE);
+	if(cmd<=5)
+		/*ads1248, PGA=1, SPS=640*/
+		ads124x_write_reg(ads124x, ADS1247_ADDR_SYS0, ADS1248_PGA_USE|ADS1248_SPS_USE);
+	else
+		/*ads1247, PGA=64, SPS=320*/
+		ads124x_write_reg(ads124x, ADS1247_ADDR_SYS0, ADS1247_PGA_USE|ADS1247_SPS_USE);
+
+	/*内部基准源打开，使用内部基准源，正常测量模式*/
 	ads124x_write_reg(ads124x, ADS1247_ADDR_MUX1, 0x30);
+
 	switch(cmd){
 		case 0:
-			/*PGA=64, SPS=320*/
-			//ads124x_write_reg(ADS1247_ADDR_SYS0, ADS1248_PGA_USE|ADS1248_SPS_USE);
-			/*内部基准源打开，使用内部基准源，正常测量模式*/
-			//ads124x_write_reg(ADS1247_ADDR_MUX1, 0x30);
 			ads124x_write_reg(ads124x, ADS1247_ADDR_MUX0, CHANNEL1);
-		break;
+			break;
 		case 1:
 			ads124x_write_reg(ads124x, ADS1247_ADDR_MUX0, CHANNEL2);
-		break;
-		break;
+			break;
+			break;
 		case 2:
 			ads124x_write_reg(ads124x, ADS1247_ADDR_MUX0, CHANNEL3);
-		break;
-		break;
+			break;
+			break;
 		case 3:
 			ads124x_write_reg(ads124x, ADS1247_ADDR_MUX0, CHANNEL4);
-		break;
-		break;
+			break;
+			break;
 		case 4:
 			ads124x_write_reg(ads124x, ADS1247_ADDR_MUX0, CHANNEL5);
-		break;
-		break;
+			break;
+			break;
 		case 5:
 			ads124x_write_reg(ads124x, ADS1247_ADDR_MUX0, CHANNEL6);
-		break;
-		break;
+			break;
+			break;
 		case 6:
 			ads124x_write_reg(ads124x, ADS1247_ADDR_MUX0, CHANNEL7);
-		break;
+			break;
 		case 7:
 			ads124x_write_reg(ads124x, ADS1247_ADDR_MUX0, CHANNEL8);
-		break;
+			break;
 	}
 	mdelay(25);
 
@@ -374,7 +371,7 @@ static int ads124x_open(struct inode *inode, struct file *filp)
 			break;
 		}
 	}
-	pr_info("%s, status=%d\n", __func__, status);
+	//pr_info("%s, status=%d\n", __func__, status);
 
 	if (status == 0) {
 		ads124x->users++;
@@ -382,6 +379,23 @@ static int ads124x_open(struct inode *inode, struct file *filp)
 		nonseekable_open(inode, filp);
 	}else
 		printk("ads124x, nothing for minor %d\n", iminor(inode));
+#if 0
+	//ads124x_write_cmd(ads124x, ADS1247_COMMAND_RESET);
+	ads124x_reset(ads124x->data->RESET);
+	ads124x_write_cmd(ads124x, ADS1247_COMMAND_SYSGCAL);
+	if(MINOR(ads124x->devt) == 0){
+		/*ads1248*/
+		ads124x_write_reg(ads124x, ADS1247_ADDR_SYS0, ADS1248_PGA_USE|ADS1248_SPS_USE);
+		pr_info("operate ads1248.\n");
+	}
+	else{
+		/*ads1247*/
+		ads124x_write_reg(ads124x, ADS1247_ADDR_SYS0, ADS1247_PGA_USE|ADS1247_SPS_USE);
+		pr_info("operate ads1247.\n");
+	}
+	ads124x_write_reg(ads124x, ADS1247_ADDR_MUX1, 0x30);
+	ads124x_read_reg(ads124x, ADS1247_ADDR_MUX0, 15);
+#endif
 
 	mutex_unlock(&device_list_lock);
 
@@ -401,7 +415,7 @@ static int ads124x_release(struct inode *inode, struct file *filp)
 	ads124x->users--;
 	if (!ads124x->users) {
 		int dofree;
-		
+
 		spin_lock_irq(&ads124x->spi_lock);
 		dofree = (ads124x->spi == NULL);
 		spin_unlock_irq(&ads124x->spi_lock);
@@ -502,7 +516,7 @@ static int __devinit ads124x_probe(struct spi_device *spi)
 	/*初始化ads124x*/
 	mdelay(30);
 	ads124x_reset(ads124x->data->RESET);
-#if 1
+#if 0
 	/*PGA=64, SPS=320*/
 	ads124x_write_reg(ads124x, ADS1247_ADDR_SYS0, ADS1248_PGA_USE|ADS1248_SPS_USE);
 	/*内部基准源打开，使用内部基准源，正常测量模式*/
@@ -513,11 +527,10 @@ static int __devinit ads124x_probe(struct spi_device *spi)
 	/*系统增益校准*/
 	ads124x_write_cmd(ads124x, ADS1247_COMMAND_SYSGCAL);
 
-#endif
 	gpio_direction_output(ads124x->data->START, 0); 
 	mdelay(20); 
-	//连续转换
-//	gpio_direction_output(ads124x->data->START, 1);
+
+#endif
 
 	/* If we can allocate a minor number, hook up this device.
 	 * Reusing minors is fine so long as udev or mdev is working.
@@ -572,7 +585,7 @@ static int __devexit ads124x_remove(struct spi_device *spi)
 		kfree(ads124x->buffer);
 		kfree(ads124x);
 	}
-	
+
 	mutex_unlock(&device_list_lock);
 
 	return 0;
@@ -613,6 +626,8 @@ static void __exit ads124x_exit(void)
 	class_destroy(ads124x_class);
 	printk(KERN_NOTICE "ads124x driver unregister success.\n" );
 }
+
+
 module_init(ads124x_init);
 module_exit(ads124x_exit);
 

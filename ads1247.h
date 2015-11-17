@@ -47,7 +47,7 @@
 #define ADS1247_GAIN_32         0x50
 #define ADS1247_GAIN_64         0x60  
 #define ADS1247_GAIN_128        0x70  
-#define ADS1247_PGA_USE			ADS1247_GAIN_1
+#define ADS1247_PGA_USE			ADS1247_GAIN_32
 #define ADS1248_PGA_USE			ADS1247_GAIN_1
 
 //ADS1247支持的转换速率列表  
@@ -62,7 +62,7 @@
 #define ADS1247_SPS_1000        0x08  
 #define ADS1247_SPS_2000        0x09  
 #define	ADS1248_SPS_USE			ADS1247_SPS_640
-#define	ADS1247_SPS_USE			ADS1247_SPS_2000
+#define	ADS1247_SPS_USE			ADS1247_SPS_320
 
 //ADS1247转换模式设置  
 #define ADS1247_MODE_SINGLECOV      0x00        //单次转换模式  
