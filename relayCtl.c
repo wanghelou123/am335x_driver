@@ -64,8 +64,8 @@ static void relay_ctl_do_timer(unsigned long arg)
 
 	//在定时器函数中重新启动定时器以实现轮询的目的
 	dev->relay_ctl_timer.expires = jiffies + HZ/(2*(dev->relay_frequency));
-	dev->relay_ctl_timer.function = &relay_ctl_do_timer;
-	dev->relay_ctl_timer.data = (unsigned long)dev;
+//	dev->relay_ctl_timer.function = &relay_ctl_do_timer;
+//	dev->relay_ctl_timer.data = (unsigned long)dev;
 	add_timer(&(dev->relay_ctl_timer));
 
 	spin_unlock(&(dev->relay_lock));
@@ -117,7 +117,7 @@ static int relay_ctl_ioctl (struct file *filp, unsigned int cmd, unsigned long a
 		if(cmd == 0 && pdata->relay_dev[arg].relay_command_status != 0) {
 			pdata->relay_dev[arg].relay_command_status = 0;
 			del_timer_sync(&(pdata->relay_dev[arg].relay_ctl_timer));
-			gpio_direction_output(pdata->data->gpio_array[arg], 1);
+			gpio_direction_output(pdata->data->gpio_array[arg], 0);
 		}else if(cmd !=0 && pdata->relay_dev[arg].relay_command_status != 1) {
 			 pdata->relay_dev[arg].relay_command_status = 1;
 			 pdata->relay_dev[arg].relay_id = pdata->data->gpio_array[arg];
@@ -131,7 +131,7 @@ static int relay_ctl_ioctl (struct file *filp, unsigned int cmd, unsigned long a
 
 		return 0;
 	}
-
+	//pr_info("cmd = %d\n", cmd);
 	switch(cmd)	 {
 		case 0:
 			gpio_direction_output(pdata->data->gpio_array[arg], 0);	
