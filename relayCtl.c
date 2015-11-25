@@ -239,7 +239,7 @@ static int __devinit relay_ctl_probe(struct platform_device *pdev)
 	//打印管脚信息,并保存管脚状态
 	for(i=0; i<relay_ctl->data->nums; i++) {
 		gpio_request(relay_ctl->data->gpio_array[i], NULL);
-		gpio_direction_output(relay_ctl->data->gpio_array[i], 1);
+		gpio_direction_output(relay_ctl->data->gpio_array[i], 0);
 		relay_ctl->relayStatus[i+1] = (gpio_get_value(relay_ctl->data->gpio_array[i]))? 1: 0;
 
 		pr_info(" relayCtl channel_%d gpio=>%d\n", i, relay_ctl->data->gpio_array[i]);	
