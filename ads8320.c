@@ -1,4 +1,3 @@
-
 #include <linux/init.h>
 #include <linux/err.h>
 #include <linux/module.h>
@@ -262,6 +261,9 @@ static int __devinit ads8320_probe(struct spi_device *spi)
 		printk("cd4051a => %d\n", ads8320->data->cd4051a);
 		printk("cd4051b => %d\n", ads8320->data->cd4051b);
 		printk("cd4051c => %d\n", ads8320->data->cd4051c);
+		gpio_request(ads8320->data->cd4051a, NULL);
+		gpio_request(ads8320->data->cd4051b, NULL);
+		gpio_request(ads8320->data->cd4051c, NULL);
 	}
 
 	/* Initialize the driver data */
@@ -315,6 +317,9 @@ static int __devexit ads8320_remove(struct spi_device *spi)
 	device_destroy(ads8320_class, ads8320->devt);
 	unregister_chrdev_region(ads8320->devt, 1);//释放原先申请的设备号
 	if (ads8320->users == 0)
+		gpio_free(ads8320->data->cd4051a);
+		gpio_free(ads8320->data->cd4051b);
+		gpio_free(ads8320->data->cd4051c);
 		kfree(ads8320);
 	
 	mutex_unlock(&device_list_lock);
