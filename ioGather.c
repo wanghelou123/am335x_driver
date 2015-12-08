@@ -18,7 +18,6 @@
 #include <asm/uaccess.h> //copy_to_user 头文件
 #define	DEVICE_NAME	"ioGather"
 static int major = 0;
-static unsigned long minor = 0;
 static struct class *io_gather_class;
 
 struct io_gather_data {
@@ -149,6 +148,7 @@ static int __devinit io_gather_probe(struct platform_device *pdev)
 	//打印管脚信息
 	int i =0;
 	for(i=0; i<io_gather->data->nums; i++) {
+		gpio_request(io_gather->data->gpio_array[i], NULL);
 		printk(KERN_NOTICE "ioGather channel_%d gpio=>%d\n", i, io_gather->data->gpio_array[i]);	
 	}
 
@@ -173,12 +173,16 @@ static int __devinit io_gather_probe(struct platform_device *pdev)
 
 static int __devexit io_gather_remove(struct platform_device *pdev)
 {
+	int i;
 	struct io_gather_data *io_gather;	
 	io_gather = platform_get_drvdata(pdev);
 	cdev_del(&io_gather->cdev);//在系统中删除 cdev
 	device_destroy(io_gather_class, io_gather->devt);//删除/dev上的节点
 	unregister_chrdev_region(io_gather->devt, 1);//释放设备号
 	if (io_gather->users == 0){
+		for(i=0; i<io_gather->data->nums; i++) {
+			gpio_free(io_gather->data->gpio_array[i]);
+		}
 		kfree(io_gather->channel_value);
 		kfree(io_gather);
 	}

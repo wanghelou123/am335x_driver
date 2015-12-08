@@ -266,6 +266,7 @@ static int __devinit relay_ctl_probe(struct platform_device *pdev)
 
 static int __devexit relay_ctl_remove(struct platform_device *pdev)
 {
+	int i;
 	struct relay_ctl_data * pdata;
 	pdata=  platform_get_drvdata(pdev);
 
@@ -274,6 +275,9 @@ static int __devexit relay_ctl_remove(struct platform_device *pdev)
 	device_destroy(relay_ctl_class, pdata->devt);//删除/dev上的节点
 	unregister_chrdev_region(pdata->devt, 1);//释放设备号
 	if (pdata->users == 0)
+		for(i=0; i<pdata->data->nums; i++) {
+			gpio_free(pdata->data->gpio_array[i]);
+		}
 		kfree(pdata->relayStatus);
 		kfree(pdata->relay_dev);
 		kfree(pdata);
