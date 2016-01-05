@@ -52,7 +52,7 @@ struct button_irq_desc mybutton;
 
 static irqreturn_t button_handler(int irq, void *dev_id) 
 {
-	key_value = gpio_get_value(mybutton.gpio) & 0x01;
+	key_value = (~gpio_get_value(mybutton.gpio)) & 0x01;
 	ev_press = 1;
 
 	wake_up_interruptible(&button_waitq);
@@ -73,7 +73,7 @@ static int button_read(struct file *filp, char __user *buffer, size_t count, lof
 
 	err = copy_to_user(buffer, (void *)&key_value, min(sizeof(key_value), count));
 
-	key_value = 0;
+	//key_value = 0;
 	ev_press = 0;
 
 	if(err)
