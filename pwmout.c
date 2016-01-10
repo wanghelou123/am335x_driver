@@ -46,6 +46,7 @@ static void PWM0_Set_Freq( unsigned long duty_cycle)
 	mm_segment_t fs;  
 	loff_t pos;  
 
+    duty_cycle=100-duty_cycle;
 	sprintf(buf, "%d", duty_cycle);
 	pr_info("%s: duty_cycle=%s\n", __func__, buf);  
 	fp = filp_open("/sys/class/pwm/ecap.1/request", O_RDWR | O_CREAT, 0644);  
