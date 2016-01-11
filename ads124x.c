@@ -330,22 +330,17 @@ static long ads124x_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 		case 1:
 			ads124x_write_reg(ads124x, ADS1247_ADDR_MUX0, CHANNEL2);
 			break;
-			break;
 		case 2:
 			ads124x_write_reg(ads124x, ADS1247_ADDR_MUX0, CHANNEL3);
-			break;
 			break;
 		case 3:
 			ads124x_write_reg(ads124x, ADS1247_ADDR_MUX0, CHANNEL4);
 			break;
-			break;
 		case 4:
 			ads124x_write_reg(ads124x, ADS1247_ADDR_MUX0, CHANNEL5);
 			break;
-			break;
 		case 5:
 			ads124x_write_reg(ads124x, ADS1247_ADDR_MUX0, CHANNEL6);
-			break;
 			break;
 		case 6:
 			ads124x_write_reg(ads124x, ADS1247_ADDR_MUX0, CHANNEL7);
