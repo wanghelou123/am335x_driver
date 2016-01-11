@@ -87,7 +87,7 @@ static size_t relay_ctl_read(struct file *filp, char __user *buf, size_t count, 
 	}
 	else {
 		for(i=0;i<pdata->data->nums;i++){//返回继电器的状态
-			pdata->relayStatus[i] = gpio_get_value(	pdata->data->gpio_array[i]);
+			pdata->relayStatus[i] = (pdata->data->active_low)?((~gpio_get_value(pdata->data->gpio_array[i]))&0x01):gpio_get_value(pdata->data->gpio_array[i]);
 		}	
 	}
 
@@ -117,7 +117,7 @@ static int relay_ctl_ioctl (struct file *filp, unsigned int cmd, unsigned long a
 		if(cmd == 0 && pdata->relay_dev[arg].relay_command_status != 0) {
 			pdata->relay_dev[arg].relay_command_status = 0;
 			del_timer_sync(&(pdata->relay_dev[arg].relay_ctl_timer));
-			gpio_direction_output(pdata->data->gpio_array[arg], 0);
+			gpio_direction_output(pdata->data->gpio_array[arg], (pdata->data->active_low)?1:0);
 		}else if(cmd !=0 && pdata->relay_dev[arg].relay_command_status != 1) {
 			 pdata->relay_dev[arg].relay_command_status = 1;
 			 pdata->relay_dev[arg].relay_id = pdata->data->gpio_array[arg];
@@ -134,11 +134,11 @@ static int relay_ctl_ioctl (struct file *filp, unsigned int cmd, unsigned long a
 	//pr_info("cmd = %d\n", cmd);
 	switch(cmd)	 {
 		case 0:
-			gpio_direction_output(pdata->data->gpio_array[arg], 0);	
+			gpio_direction_output(pdata->data->gpio_array[arg], (pdata->data->active_low)?1:0);	
 			pdata->relayStatus[arg+1] = 0;
 		break;
 		case 1:
-			gpio_direction_output(pdata->data->gpio_array[arg], 1);	
+			gpio_direction_output(pdata->data->gpio_array[arg], (pdata->data->active_low)?0:1);	
 			pdata->relayStatus[arg+1] = 1;
 		break;
 		default:
@@ -239,7 +239,7 @@ static int __devinit relay_ctl_probe(struct platform_device *pdev)
 	//打印管脚信息,并保存管脚状态
 	for(i=0; i<relay_ctl->data->nums; i++) {
 		gpio_request(relay_ctl->data->gpio_array[i], NULL);
-		gpio_direction_output(relay_ctl->data->gpio_array[i], 0);
+		gpio_direction_output(relay_ctl->data->gpio_array[i], (relay_ctl->data->active_low)?1:0);
 		relay_ctl->relayStatus[i+1] = (gpio_get_value(relay_ctl->data->gpio_array[i]))? 1: 0;
 
 		pr_info(" relayCtl channel_%d gpio=>%d\n", i, relay_ctl->data->gpio_array[i]);	
