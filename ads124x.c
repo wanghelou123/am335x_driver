@@ -186,7 +186,7 @@ void ads124x_write_reg(struct ads124x_data *ads124x, unsigned char reg,unsigned 
 void ads124x_write_cmd(struct ads124x_data *ads124x, unsigned char cmd)
 {
 	ads124x_write_char(ads124x, cmd);
-	mdelay(401);
+	msleep(401);
 	udelay(2);
 }
 
@@ -195,7 +195,7 @@ static void ads124x_reset(unsigned gpio)
 	gpio_set_value(gpio, 0);
 	udelay(10);
 	gpio_set_value(gpio, 1);
-	mdelay(1);
+	msleep(1);
 }
 
 void ads124x_read_once(struct ads124x_data *ads124x)
@@ -349,7 +349,7 @@ static long ads124x_ioctl(struct file *filp, unsigned int cmd, unsigned long arg
 			ads124x_write_reg(ads124x, ADS1247_ADDR_MUX0, CHANNEL8);
 			break;
 	}
-	mdelay(25);
+	msleep(25);
 
 	return 0;
 }
@@ -509,7 +509,7 @@ static int __devinit ads124x_probe(struct spi_device *spi)
 
 
 	/*初始化ads124x*/
-	mdelay(30);
+	msleep(30);
 	ads124x_reset(ads124x->data->RESET);
 #if 0
 	/*PGA=64, SPS=320*/
@@ -523,7 +523,7 @@ static int __devinit ads124x_probe(struct spi_device *spi)
 	ads124x_write_cmd(ads124x, ADS1247_COMMAND_SYSGCAL);
 
 	gpio_direction_output(ads124x->data->START, 0); 
-	mdelay(20); 
+	msleep(20); 
 
 #endif
 

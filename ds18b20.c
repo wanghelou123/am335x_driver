@@ -243,7 +243,7 @@ static int ds18b20_read(struct file *filp, char *buf, size_t count, loff_t *f_po
 	int ret;
 
 	DS18B20_TmpChange();
-	msleep(500);
+	msleep(50);
 	ds18b20_val =  DS18B20_Temperature();
 	//printk("ds18b20_val=0x%x\n", ds18b20_val);
 	if(ds18b20_val == 0xffff)
